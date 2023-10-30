@@ -66,6 +66,9 @@ const char kEnergyCommands[] PROGMEM = "|"  // No prefix
   D_CMND_SAFEPOWER "|" D_CMND_SAFEPOWERHOLD "|"  D_CMND_SAFEPOWERWINDOW "|"
 #endif  // USE_ENERGY_POWER_LIMIT
 #endif  // USE_ENERGY_MARGIN_DETECTION
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  D_CMND_USERCOMMAND "|"
+#endif
   D_CMND_ENERGYTODAY "|" D_CMND_ENERGYYESTERDAY "|" D_CMND_ENERGYTOTAL "|" D_CMND_ENERGYEXPORTACTIVE "|" D_CMND_ENERGYUSAGE "|" D_CMND_ENERGYEXPORT "|" D_CMND_TARIFF;
 
 void (* const EnergyCommand[])(void) PROGMEM = {
@@ -79,6 +82,9 @@ void (* const EnergyCommand[])(void) PROGMEM = {
   &CmndSafePower, &CmndSafePowerHold, &CmndSafePowerWindow,
 #endif  // USE_ENERGY_POWER_LIMIT
 #endif  // USE_ENERGY_MARGIN_DETECTION
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  &CmndUserCommand,
+#endif
   &CmndEnergyToday, &CmndEnergyYesterday, &CmndEnergyTotal, &CmndEnergyExportActive, &CmndEnergyUsage, &CmndEnergyExport, &CmndTariff};
 
 typedef struct {
@@ -997,6 +1003,12 @@ void CmndCurrentSet(void) {
 void CmndFrequencySet(void) {
   EnergyCommandSetCalResponse(ENERGY_FREQUENCY_CALIBRATION);
 }
+
+#ifdef FIRMWARE_SAMPLINGCURRENT
+void CmndUserCommand(void) {
+  EnergyCommandSetCalResponse(ENERGY_CURRENT_CALIBRATION);
+}
+#endif
 
 void CmndModuleAddress(void) {
   if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 4) && (1 == Energy->phase_count)) {

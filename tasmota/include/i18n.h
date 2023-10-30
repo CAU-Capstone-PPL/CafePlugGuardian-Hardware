@@ -485,6 +485,9 @@
 #define D_CMND_MAXENERGYSTART "MaxEnergyStart"
   #define D_JSON_ENERGYMONITOR "EnergyMonitor"
   #define D_JSON_MAXENERGYREACHED "MaxEnergyReached"
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  #define D_CMND_USERCOMMAND "UserCommand"
+#endif
 
 // Commands xdrv_04_light.ino
 #define D_SO_CHANNELREMAP "ChannelRemap"    // SO37
