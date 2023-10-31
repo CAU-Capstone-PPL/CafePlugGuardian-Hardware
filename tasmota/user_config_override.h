@@ -91,9 +91,11 @@ Examples :
   #define USER_TEMPLATE "{\"NAME\":\"SamplingCurrent\",\"GPIO\":[0,0,0,3104,0,32,0,0,224,576,0,0,0,0],\"FLAG\":0,\"BASE\":18}"
 
 // -- MQTT ----------------------------------------
+  #undef MQTT_HOST
   #define MQTT_HOST              ""                // [MqttHost]
 
 // -- MQTT - Telemetry ----------------------------
+  #undef TELE_PERIOD
   #define TELE_PERIOD            0               // [TelePeriod] Telemetry (0 = disable, 10 - 3600 seconds)
 #endif
 
