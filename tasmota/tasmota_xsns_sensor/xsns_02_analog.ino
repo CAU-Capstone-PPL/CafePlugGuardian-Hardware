@@ -750,6 +750,17 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #endif
   &CmndAdcParam };
 
+#ifdef FIRMWARE_SAMPLINGCURRENT
+void TestCommand(void) {
+  Response_P(PSTR("{\"%s\":"), "key");
+  ResponseAppend_P(PSTR("%d}"), 1);
+}
+
+void CmndTestCommand(void) {
+  TestCommand();
+}
+#endif
+
 void CmndAdcParam(void) {
   if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= MAX_ADCS)) {
     uint8_t idx = XdrvMailbox.index -1;
