@@ -741,12 +741,16 @@ void AdcShow(bool json) {
 const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
+  D_CMND_TESTPUTJSON "|"
+  D_CMND_CAFEPLUGSTATUS "|"
 #endif
   D_CMND_ADCPARAM;
 
 void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
+  &CmndTestPutJson,
+  &CafePlugStatus,
 #endif
   &CmndAdcParam };
 
@@ -756,8 +760,20 @@ void TestCommand(void) {
   ResponseAppend_P(PSTR("%d}"), 1);
 }
 
+void TestPutJson(void) {
+
+}
+
 void CmndTestCommand(void) {
   TestCommand();
+}
+
+void CmndTestPutJson(void) {
+  TestPutJson();
+}
+
+void CmndCafePlugStatus(void) {
+  
 }
 #endif
 
