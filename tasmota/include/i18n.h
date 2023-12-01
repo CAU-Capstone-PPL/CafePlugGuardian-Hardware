@@ -792,7 +792,7 @@
 // Commands xsns_02_analog.ino
 #define D_CMND_ADCPARAM "AdcParam"
 // new Commands for Sampling Analog
-#define FIRMWARE_SAMPLINGCURRENT
+#ifdef FIRMWARE_SAMPLINGCURRENT
   #define D_CMND_TESTCOMMAND "TestCommand"
   #define D_CMND_TESTPUTJSON "TestPutJson"
 

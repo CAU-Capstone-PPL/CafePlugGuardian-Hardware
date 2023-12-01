@@ -750,7 +750,7 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestPutJson,
-  &CafePlugStatus,
+  &CmndCafePlugStatus,
 #endif
   &CmndAdcParam };
 
