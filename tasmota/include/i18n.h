@@ -791,6 +791,10 @@
 
 // Commands xsns_02_analog.ino
 #define D_CMND_ADCPARAM "AdcParam"
+// new Commands for Sampling Analog
+#define FIRMWARE_SAMPLINGCURRENT
+  #define D_CMND_TESTCOMMAND "TestCommand"
+#endif
 
 // Commands xsns_05_ds18x20.ino
 #define D_CMND_DS_ALIAS "Alias"

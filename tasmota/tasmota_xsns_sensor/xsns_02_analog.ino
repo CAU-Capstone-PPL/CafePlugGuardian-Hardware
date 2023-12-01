@@ -739,9 +739,15 @@ void AdcShow(bool json) {
 \*********************************************************************************************/
 
 const char kAdcCommands[] PROGMEM = "|"  // No prefix
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  D_CMND_TESTCOMMAND "|"
+#endif
   D_CMND_ADCPARAM;
 
 void (* const AdcCommand[])(void) PROGMEM = {
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  &CmndTestCommand,
+#endif
   &CmndAdcParam };
 
 void CmndAdcParam(void) {
