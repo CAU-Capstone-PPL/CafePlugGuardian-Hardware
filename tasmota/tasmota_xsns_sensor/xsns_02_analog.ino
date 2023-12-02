@@ -741,7 +741,7 @@ void AdcShow(bool json) {
 const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
-  D_CMND_TESTPUTJSON "|"
+  D_CMND_TESTSIZE "|"
   D_CMND_CAFEPLUGSTATUS "|"
 #endif
   D_CMND_ADCPARAM;
@@ -749,7 +749,7 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
-  &CmndTestPutJson,
+  &CmndTestSize,
   &CmndCafePlugStatus,
 #endif
   &CmndAdcParam };
@@ -760,16 +760,30 @@ void TestCommand(void) {
   ResponseAppend_P(PSTR("%d}"), 1);
 }
 
-void TestPutJson(void) {
+void TestSize(void) {
+  int32_t payload = XdrvMailbox.payload;
 
+  if (0 == XdrvMailbox.index) {
+    payload = 1;
+  }
+
+  Response_P(PSTR("{\"%s\":["), "current");
+  for(int i = 0; i < payload; i++) {
+    if(i == 0) {
+      ResponseAppend_P(PSTR("%d"), 1);
+    } else {
+      ResponseAppend_P(PSTR(",%d"), i + 1);
+    }
+  }
+  ResponseAppend_P(PSTR("]}"));
 }
 
 void CmndTestCommand(void) {
   TestCommand();
 }
 
-void CmndTestPutJson(void) {
-  TestPutJson();
+void CmndTestSize(void) {
+  TestSize();
 }
 
 void CmndCafePlugStatus(void) {
