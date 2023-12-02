@@ -742,6 +742,7 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTSIZE "|"
+  D_CMND_TESTTIMER "|"
   D_CMND_CAFEPLUGSTATUS "|"
 #endif
   D_CMND_ADCPARAM;
@@ -750,17 +751,45 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestSize,
+  &CmndTestTimer,
   &CmndCafePlugStatus,
 #endif
   &CmndAdcParam };
 
 #ifdef FIRMWARE_SAMPLINGCURRENT
-void TestCommand(void) {
+#include "TimerInterrupt_Generic.h"
+
+#define ANALOG_PIN A0;
+
+ESP32Timer ITimer0(0);
+
+volatile int timerEndStatus = 0;
+volatile int timerCount = 0;
+int sample = 0;
+
+bool IRAM_ATTR TimerHandler0(void * timerNo) {
+  int count = timerCount++;
+
+  if (count == 0) {
+    ResponseAppend_P(PSTR("%d"), 1);
+  } else {
+    ResponseAppend_P(PSTR(",%d"), count + 1);
+  }
+
+  if (timerCount >= sample) {
+    timerEndStatus = 1;
+    ITimer0.detachInterrupt();
+  }
+
+  return true;
+}
+
+void CmndTestCommand(void) {
   Response_P(PSTR("{\"%s\":"), "key");
   ResponseAppend_P(PSTR("%d}"), 1);
 }
 
-void TestSize(void) {
+void CmndTestSize(void) {
   int32_t payload = XdrvMailbox.payload;
 
   if (0 == XdrvMailbox.index) {
@@ -778,12 +807,22 @@ void TestSize(void) {
   ResponseAppend_P(PSTR("]}"));
 }
 
-void CmndTestCommand(void) {
-  TestCommand();
-}
+void CmndTestTimer(void) {
+  int32_t payload = XdrvMailbox.payload;
 
-void CmndTestSize(void) {
-  TestSize();
+  if (0 == XdrvMailbox.index) {
+    payload = 1;
+  }
+  sample = payload;
+  Response_P(PSTR("{\"%s\":["), "current");
+
+  ITimer0.attachInterruptInterval(500, TimerHandler0);
+
+  while(timerEndStatus == 0) {}
+  ResponseAppend_P(PSTR("]}"));
+  timerEndStatus = 0;
+  timerCount = 0;
+  sample = 0;
 }
 
 void CmndCafePlugStatus(void) {
