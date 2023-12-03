@@ -797,6 +797,7 @@
   #define D_CMND_TESTSIZE "TestSize"
   #define D_CMND_TESTTIMER "TestTimer"
 
+  #define D_CMND_SAMPLINGCURRENT "SamplingCurrent"
   #define D_CMND_CAFEPLUGSTATUS "CafePlugStatus"
 #endif
 
