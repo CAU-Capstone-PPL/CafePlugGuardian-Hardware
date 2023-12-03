@@ -763,6 +763,7 @@ void (* const AdcCommand[])(void) PROGMEM = {
 
 ESP32Timer ITimer0(0);
 
+bool initialTimer = true;
 volatile int timerEndStatus = 0;
 volatile int timerCount = 0;
 int sample = 0;
@@ -778,7 +779,7 @@ bool IRAM_ATTR TimerHandler0(void * timerNo) {
 
   if (timerCount >= sample) {
     timerEndStatus = 1;
-    ITimer0.detachInterrupt();
+    ITimer0.stopTimer();
   }
 
   return true;
@@ -816,7 +817,12 @@ void CmndTestTimer(void) {
   sample = payload;
   Response_P(PSTR("{\"%s\":["), "current");
 
-  ITimer0.attachInterruptInterval(500, TimerHandler0);
+  if(initialTimer) {
+    initialTimer = false;
+    ITimer0.attachInterruptInterval(500, TimerHandler0);
+  } else {
+    ITimer0.restartTimer();
+  }
 
   while(timerEndStatus == 0) {}
   ResponseAppend_P(PSTR("]}"));
