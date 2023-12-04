@@ -761,10 +761,23 @@ void (* const AdcCommand[])(void) PROGMEM = {
 
 #define _USE_MATH_DEFINES
 
-#define CURRENT_PIN A0
-#define R1 4960.0
-#define R2 9940.0
-#define AMP 0.185
+struct {
+  float current = 0.0;
+  float voltage = 0.0;
+  float power = 0.0;
+  float total_power = 0.0;
+} PowerStatus;
+
+struct {
+  float offsetVolt = 5.0;
+  float analogRange = 4095.0;
+  float halfRange = 2047.0;
+  float acs712_amp = 0.185;
+} CalSample;
+
+struct {
+
+} TimerStatus;
 
 ESP32Timer ITimer0(0);
 ESP32Timer ITimer1(1);
@@ -779,12 +792,53 @@ int sample = 0;
 volatile float filter = 0;
 float tau = 0;
 
+float Acs712Current(int raw) {
+  float adc_voltage = raw * (CalSample.offsetVolt / CalSample.analogRange);
+  float current = (adc_voltage - CalSample.offsetVolt / 2) / CalSample.acs712_amp;
+
+  return current;
+}
+
+float Zmpt101bVoltage(int raw) {
+  float voltage = (raw - CalSample.halfRange) / 4.0;
+
+  return voltage;
+}
+
+void MeasurePower(void) {
+  int samples = 0;
+  float currentSquareSum = 0.0;
+  float voltageSumSquareSum = 0.0;
+  float sumVI = 0.0;
+
+  uint32_t start = micros();
+  while (micros() - start < 1000000) {
+    samples++;
+    int currentRaw = analogRead(A0);
+    int voltageRaw = analogRead(A1);
+
+    float current = Acs712Current(currentRaw);
+    float voltage = Zmpt101bVoltage(voltageRaw);
+
+    currentSquareSum += current * current;
+    voltageSquareSum += voltage * voltage;
+    sumVI += current * voltage;
+  }
+
+  float currentRMS = sqrt(currentSquareSum / samples);
+  float voltageRMS = sqrt(voltageSquareSum / samples);
+  float powerFactor = 1.0; //임시로 역률 1로 고정
+
+  PowerStatus.current = currentRMS;
+  PowerStatus.voltage = voltageRMS;
+  PowerStatus.power = currentRMS * voltageRMS * powerFactor;
+}
+
 bool IRAM_ATTR SamplingCurrent(void * timerNo) {
   int count = timerCount++;
 
-  int rawValue = analogRead(CURRENT_PIN);
-  float adc_voltage = rawValue * (5.0 / 4095.0);
-  float current = (adc_voltage - 2.5) / AMP;
+  int currentRaw = analogRead(A0);
+  float current = Acs712Current(currentRaw);
 
   if (count == 0) {
       ResponseAppend_P(PSTR("%f"), current);
@@ -803,9 +857,8 @@ bool IRAM_ATTR SamplingCurrent(void * timerNo) {
 bool IRAM_ATTR SamplingCurrentFilter(void * timerNo) {
   int count = timerCount++;
 
-  int rawValue = analogRead(CURRENT_PIN);
-  float adc_voltage = rawValue * (5.0 / 4095.0);
-  float current = (adc_voltage - 2.5) / AMP;
+  int currentRaw = analogRead(A0);
+  float current = Acs712Current(currentRaw);
 
   if (count == 0) {
     filter = current;
