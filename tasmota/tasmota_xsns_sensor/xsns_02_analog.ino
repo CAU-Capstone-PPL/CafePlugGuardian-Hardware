@@ -777,19 +777,13 @@ struct {
   float acs712_amp = 0.185;
 } CalSample;
 
-struct {
-
-} TimerStatus;
-
 ESP32Timer ITimer0(0);
-ESP32Timer ITimer1(1);
 
 bool initialTimer0 = true;
-bool initialTimer1 = true;
+volatile bool endTimer0 = false;
 
-volatile int timerEndStatus = 0;
 volatile int timerCount = 0;
-int sample = 0;
+int filterCount = 500;
 
 volatile float filter = 0;
 float tau = 0;
@@ -839,47 +833,30 @@ void MeasurePower(void) {
 bool IRAM_ATTR SamplingCurrent(void * timerNo) {
   int count = timerCount++;
 
-  int currentRaw = analogRead(A0);
-  float current = Acs712Current(currentRaw);
+  if (count <= 499 + filterCount) {
+    int currentRaw = analogRead(A0);
+    float current = Acs712Current(currentRaw);
 
-  if (count == 0) {
-      ResponseAppend_P(PSTR("%f"), current);
-  } else {
-      ResponseAppend_P(PSTR(",%f"), current);
-  }
+    if (filterCount != 0) {
+      if (count == 0) {
+        filter = current;
+      } else {
+        filter = (tau * filter + 0.0005 * current) / (tau + 0.0005);
+      }
+    }
 
-  if (timerCount >= 500) {
-    timerEndStatus = 1;
-    ITimer0.stopTimer();
-  }
+    if (count >= filterCount) {
+      if (count == filterCount) {
+        ResponseAppend_P(PSTR("%f"), current);
+      } else {
+        ResponseAppend_P(PSTR(",%f"), current);
+      }
+    }
 
-  return true;
-}
-
-bool IRAM_ATTR SamplingCurrentFilter(void * timerNo) {
-  int count = timerCount++;
-
-  int currentRaw = analogRead(A0);
-  float current = Acs712Current(currentRaw);
-
-  if (count == 0) {
-    filter = current;
-  } else {
-
-    filter = (tau * filter + 0.0005 * current) / (tau + 0.0005);
-    if (count == 200) {
-      ResponseAppend_P(PSTR("%f"), filter);
-    } else if (count > 200) {
-      ResponseAppend_P(PSTR(",%f"), filter);
+    if(count >= 499 + filterCount) {
+      endTimer0 = true;
     }
   }
-
-  if (timerCount >= 700) {
-    timerEndStatus = 1;
-    ITimer1.stopTimer();
-  }
-
-  return true;
 }
 
 void CmndTestCommand(void) {
@@ -913,31 +890,32 @@ void CmndTestPower(void) {
 }
 
 void CmndSamplingCurrent(void) {
-  if(XdrvMailbox.payload == 0) {
-    if(initialTimer0) {
-      initialTimer0 = false;
-      ITimer0.attachInterruptInterval(500, SamplingCurrent);
-    } else {
-      ITimer0.restartTimer();
-    }
-  } else {
+  if(XdrvMailbox.payload > 0) {
+    filterCount = 500;
     int32_t cutoff = XdrvMailbox.payload;
     tau = 1 / (2 * M_PI * cutoff);
-
-    if(initialTimer1) {
-      initialTimer1 = false;
-      ITimer1.attachInterruptInterval(500, SamplingCurrentFilter);
-    } else {
-      ITimer1.restartTimer();
-    }
+  } else {
+    filterCount = 0;
   }
+  timerCount = 0;
+  endTimer = false;
 
   Response_P(PSTR("{\"%s\":["), "current");
 
-  while(timerEndStatus == 0) {}
+  if(initialTimer0) {
+    initialTimer0 = false;
+    ITimer0.attachInterruptInterval(500, SamplingCurrent);
+  } else {
+    ITimer0.restartTimer();
+  }
+
+  while(true) {
+    if(endTimer0) {
+      ITimer0.stopTimer();
+      break;
+    }
+  }
   ResponseAppend_P(PSTR("]}"));
-  timerEndStatus = 0;
-  timerCount = 0;
 }
 
 void CmndCafePlugStatus(void) {
