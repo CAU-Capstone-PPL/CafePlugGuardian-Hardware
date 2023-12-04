@@ -742,6 +742,7 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTSIZE "|"
+  D_CMND_TESTPOWER "|"
   D_CMND_SAMPLINGCURRENT "|"
   D_CMND_CAFEPLUGSTATUS "|"
 #endif
@@ -751,6 +752,7 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestSize,
+  &CmndTestPower,
   &CmndSamplingCurrent,
   &CmndCafePlugStatus,
 #endif
@@ -901,6 +903,13 @@ void CmndTestSize(void) {
     }
   }
   ResponseAppend_P(PSTR("]}"));
+}
+
+void CmndTestPower(void) {
+  MeasurePower();
+  Response_P(PSTR("{\"%s\":%f,"), "current", PowerStatus.current);
+  ResponseAppend_P(PSTR("{\"%s\":%f,"), "voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("{\"%s\":%f}"), "power", PowerStatus.power);
 }
 
 void CmndSamplingCurrent(void) {

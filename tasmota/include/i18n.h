@@ -795,7 +795,7 @@
 #ifdef FIRMWARE_SAMPLINGCURRENT
   #define D_CMND_TESTCOMMAND "TestCommand"
   #define D_CMND_TESTSIZE "TestSize"
-  #define D_CMND_TESTTIMER "TestTimer"
+  #define D_CMND_TESTPOWER "TestPower"
 
   #define D_CMND_SAMPLINGCURRENT "SamplingCurrent"
   #define D_CMND_CAFEPLUGSTATUS "CafePlugStatus"
