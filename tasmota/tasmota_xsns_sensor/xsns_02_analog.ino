@@ -804,14 +804,14 @@ float Zmpt101bVoltage(int raw) {
 void MeasurePower(void) {
   int samples = 0;
   float currentSquareSum = 0.0;
-  float voltageSumSquareSum = 0.0;
+  float voltageSquareSum = 0.0;
   float sumVI = 0.0;
 
   uint32_t start = micros();
   while (micros() - start < 1000000) {
     samples++;
     int currentRaw = analogRead(A0);
-    int voltageRaw = analogRead(A1);
+    int voltageRaw = analogRead(39);
 
     float current = Acs712Current(currentRaw);
     float voltage = Zmpt101bVoltage(voltageRaw);
@@ -898,7 +898,7 @@ void CmndSamplingCurrent(void) {
     filterCount = 0;
   }
   timerCount = 0;
-  endTimer = false;
+  endTimer0 = false;
 
   Response_P(PSTR("{\"%s\":["), "current");
 
