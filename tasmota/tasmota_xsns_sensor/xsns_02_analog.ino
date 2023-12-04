@@ -904,14 +904,15 @@ void CmndSamplingCurrent(void) {
 
   Response_P(PSTR("{\"%s\":["), "current");
 
-  ITimer0.attachInterruptInterval(500, SamplingCurrent);
-
-  while(true) {
-    if(endTimer0) {
-      ITimer0.stopTimer();
-      break;
+  if(ITimer0.attachInterruptInterval(500, SamplingCurrent)) {
+    while(true) {
+      if(endTimer0) {
+        ITimer0.stopTimer();
+        break;
+      }
     }
   }
+  
   ResponseAppend_P(PSTR("]}"));
 }
 
