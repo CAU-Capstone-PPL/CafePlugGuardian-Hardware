@@ -777,8 +777,6 @@ struct {
   float acs712_amp = 0.185;
 } CalSample;
 
-ESP32Timer ITimer0(0);
-
 bool initialTimer0 = true;
 volatile bool endTimer0 = false;
 
@@ -892,6 +890,8 @@ void CmndTestPower(void) {
 }
 
 void CmndSamplingCurrent(void) {
+  ESP32Timer ITimer0(0);
+
   if(XdrvMailbox.payload > 0) {
     filterCount = 500;
     int32_t cutoff = XdrvMailbox.payload;
@@ -904,12 +904,7 @@ void CmndSamplingCurrent(void) {
 
   Response_P(PSTR("{\"%s\":["), "current");
 
-  if(initialTimer0) {
-    initialTimer0 = false;
-    ITimer0.attachInterruptInterval(500, SamplingCurrent);
-  } else {
-    ITimer0.restartTimer();
-  }
+  ITimer0.attachInterruptInterval(500, SamplingCurrent);
 
   while(true) {
     if(endTimer0) {
