@@ -886,9 +886,9 @@ void CmndTestSize(void) {
 
 void CmndTestPower(void) {
   MeasurePower();
-  Response_P(PSTR("{\"%s\":%f,"), "current", PowerStatus.current);
-  ResponseAppend_P(PSTR("{\"%s\":%f,"), "voltage", PowerStatus.voltage);
-  ResponseAppend_P(PSTR("{\"%s\":%f}"), "power", PowerStatus.power);
+  Response_P(PSTR("{\"%s\":%f, "), "current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
 }
 
 void CmndSamplingCurrent(void) {
