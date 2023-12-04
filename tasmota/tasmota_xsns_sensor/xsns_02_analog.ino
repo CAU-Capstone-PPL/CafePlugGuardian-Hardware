@@ -857,6 +857,8 @@ bool IRAM_ATTR SamplingCurrent(void * timerNo) {
       endTimer0 = true;
     }
   }
+
+  return true;
 }
 
 void CmndTestCommand(void) {
