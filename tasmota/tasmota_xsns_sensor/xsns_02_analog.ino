@@ -743,6 +743,7 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTPOWER "|"
   D_CMND_SAMPLINGCURRENT "|"
+  D_CMND_SAMPLINGVOLTAGE "|"
   D_CMND_CAFEPLUGSTATUS "|"
 #endif
   D_CMND_ADCPARAM;
@@ -752,6 +753,7 @@ void (* const AdcCommand[])(void) PROGMEM = {
   &CmndTestCommand,
   &CmndTestPower,
   &CmndSamplingCurrent,
+  &CmndSamplingVoltage,
   &CmndCafePlugStatus,
 #endif
   &CmndAdcParam };
@@ -773,10 +775,10 @@ struct {
 } PowerStatus;
 
 struct {
-  double offset5V = 5.0;
+  double offset5V = 5.06;
   double offset3V = 3.3;
   double r1 = 4960.0;
-  double r2 = 9940.0;
+  double r2 = 9920.0;
   double acs712_amp = 0.185;
   double zmpt101b_amp = 500.0;
   int multi_sample = 1;
@@ -784,9 +786,13 @@ struct {
 
 ESP32Timer ITimer0(0);
 bool initialTimer0 = true;
+ESP32Timer ITimer1(1);
+bool initialTimer1 = true;
+
 volatile int timerCount = 0;
 
 int samplingCurrentRawBuffer[1000];
+int samplingVoltageRawBuffer[1000];
 
 double ReadCalVoltage(int raw) {
   if (raw < 1 || raw > 4095) {
@@ -861,6 +867,20 @@ bool IRAM_ATTR SamplingCurrent(void * timerNo) {
   return true;
 }
 
+bool IRAM_ATTR SamplingVoltage(void * timerNo) {
+  int count = timerCount;
+
+  if (count >= 0 || count < 1000) {
+    for(int i = 0; i < CalSample.multi_sample; i++) {
+      samplingVoltageRawBuffer[count] += analogRead(esp32_pin.voltage_pin);
+    }
+    samplingVoltageRawBuffer[count] /= CalSample.multi_sample;
+  }
+  timerCount++;
+
+  return true;
+}
+
 void CmndTestCommand(void) {
   Response_P(PSTR("{\"%s\":"), "key");
   ResponseAppend_P(PSTR("%d}"), 1);
@@ -877,7 +897,7 @@ void CmndSamplingCurrent(void) {
   double tau = 0.0;
   int filterCount = 0;
   int payload = XdrvMailbox.payload;
-  
+
   CalSample.multi_sample = payload / 10000;
   if(CalSample.multi_sample == 0) {
     CalSample.multi_sample = 1;
@@ -925,6 +945,64 @@ void CmndSamplingCurrent(void) {
         ResponseAppend_P(PSTR("%f"), current);
       } else {
         ResponseAppend_P(PSTR(",%f"), current);
+      }
+    }
+  }
+  ResponseAppend_P(PSTR("]}"));
+}
+
+void CmndSamplingVoltage(void) {
+  double tau = 0.0;
+  int filterCount = 0;
+  int payload = XdrvMailbox.payload;
+
+  CalSample.multi_sample = payload / 10000;
+  if(CalSample.multi_sample == 0) {
+    CalSample.multi_sample = 1;
+  }
+
+  if(payload % 10000 != 0) {
+    int cutoff = payload % 10000;
+    tau = 1 / (2 * M_PI * cutoff);
+    filterCount = 500;
+  }
+
+  timerCount = 0;
+
+  if(initialTimer1) {
+    initialTimer1 = false;
+    ITimer1.attachInterruptInterval(500, SamplingVoltage);
+  } else {
+    ITimer1.enableTimer();
+  }
+
+  while(true) {
+    if(timerCount >= filterCount + 500) {
+      ITimer1.disableTimer();
+      break;
+    }
+  }
+
+  double filter = 0.0;
+  Response_P(PSTR("{\"%s\":["), "voltage");
+  for(int i = 0; i < filterCount + 500; i++) {
+    double voltage = Zmpt101bVoltage(samplingVoltageRawBuffer[i]);
+    samplingVoltageRawBuffer[i] = 0;
+
+    if(filterCount > 0) {
+      if(i == 0) {
+        filter = voltage;
+      } else {
+        filter = (tau * filter + 0.0005 * voltage) / (tau + 0.0005);
+        voltage = filter;
+      }
+    }
+
+    if(i >= filterCount) {
+      if(i == filterCount) {
+        ResponseAppend_P(PSTR("%f"), voltage);
+      } else {
+        ResponseAppend_P(PSTR(",%f"), voltage);
       }
     }
   }

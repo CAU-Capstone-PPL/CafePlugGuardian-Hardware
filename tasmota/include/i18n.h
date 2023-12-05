@@ -797,6 +797,7 @@
   #define D_CMND_TESTPOWER "TestPower"
 
   #define D_CMND_SAMPLINGCURRENT "SamplingCurrent"
+  #define D_CMND_SAMPLINGVOLTAGE "SamplingVoltage"
   #define D_CMND_CAFEPLUGSTATUS "CafePlugStatus"
 #endif
 
