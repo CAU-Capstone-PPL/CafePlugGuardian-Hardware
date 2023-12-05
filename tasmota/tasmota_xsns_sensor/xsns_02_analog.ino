@@ -801,7 +801,7 @@ double ReadCalVoltage(int raw) {
 
 double Acs712Current(int raw) {
   double adc_voltage = ReadCalVoltage(raw);
-  double voltage5 = adc_voltage * ((r1 + r2) / r2) * (5.0 / CalSample.offset5V);
+  double voltage5 = adc_voltage * ((CalSample.r1 + CalSample.r2) / CalSample.r2) * (5.0 / CalSample.offset5V);
 
   double current = (voltage5 - 2.5) / CalSample.acs712_amp;
 
@@ -826,8 +826,8 @@ void MeasurePower(void) {
   uint32_t start = micros();
   while (micros() - start < 1000000) {
     samples++;
-    int currentRaw = analogRead(acs712_pin.current_pin);
-    int voltageRaw = analogRead(acs712_pin.voltage_pin);
+    int currentRaw = analogRead(esp32_pin.current_pin);
+    int voltageRaw = analogRead(esp32_pin.voltage_pin);
 
     double current = Acs712Current(currentRaw);
     double voltage = Zmpt101bVoltage(voltageRaw);
@@ -874,7 +874,7 @@ void CmndSamplingCurrent(void) {
   int filterCount = 0;
 
   if(XdrvMailbox.payload > 0) {
-    int cutfoff = XdrvMailbox.payload;
+    int cutoff = XdrvMailbox.payload;
     tau = 1 / (2 * M_PI * cutoff);
     filterCount = 500;
   }
@@ -885,12 +885,12 @@ void CmndSamplingCurrent(void) {
     initialTimer0 = false;
     ITimer0.attachInterruptInterval(500, SamplingCurrent);
   } else {
-    ITimer0.restartTimer();
+    ITimer0.enableTimer();
   }
 
   while(true) {
     if(timerCount >= filterCount + 500) {
-      ITimer0.stopTimer();
+      ITimer0.disableTimer();
       break;
     }
   }
