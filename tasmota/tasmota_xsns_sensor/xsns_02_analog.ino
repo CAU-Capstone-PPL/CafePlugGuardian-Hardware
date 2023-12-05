@@ -876,16 +876,17 @@ void CmndTestPower(void) {
 void CmndSamplingCurrent(void) {
   double tau = 0.0;
   int filterCount = 0;
+  int payload = XdrvMailbox.payload;
+  
+  CalSample.multi_sample = payload / 10000;
+  if(CalSample.multi_sample == 0) {
+    CalSample.multi_sample = 1;
+  }
 
-  if(XdrvMailbox.payload > 0) {
-    int payload = XdrvMailbox.payload;
-    CalSample.multi_sample = payload / 10000;
-
+  if(payload % 10000 != 0) {
     int cutoff = payload % 10000;
     tau = 1 / (2 * M_PI * cutoff);
     filterCount = 500;
-  } else {
-    CalSample.multi_sample = 1;
   }
 
   timerCount = 0;
