@@ -779,6 +779,7 @@ struct {
   double r2 = 9940.0;
   double acs712_amp = 0.185;
   double zmpt101b_amp = 500.0;
+  int multi_sample = 1;
 } CalSample;
 
 ESP32Timer ITimer0(0);
@@ -850,7 +851,10 @@ bool IRAM_ATTR SamplingCurrent(void * timerNo) {
   int count = timerCount;
 
   if (count >= 0 || count < 1000) {
-    samplingCurrentRawBuffer[count] = analogRead(esp32_pin.current_pin);
+    for(int i = 0; i < CalSample.multi_sample; i++) {
+      samplingCurrentRawBuffer[count] += analogRead(esp32_pin.current_pin);
+    }
+    samplingCurrentRawBuffer[count] /= CalSample.multi_sample;
   }
   timerCount++;
 
@@ -874,9 +878,14 @@ void CmndSamplingCurrent(void) {
   int filterCount = 0;
 
   if(XdrvMailbox.payload > 0) {
-    int cutoff = XdrvMailbox.payload;
+    int payload = XdrvMailbox.payload;
+    CalSample.multi_sample = payload / 10000;
+
+    int cutoff = payload % 10000;
     tau = 1 / (2 * M_PI * cutoff);
     filterCount = 500;
+  } else {
+    CalSample.multi_sample = 1;
   }
 
   timerCount = 0;
