@@ -742,6 +742,8 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTPOWER "|"
+
+  D_CMND_PLUGTOGGLE "|"
   D_CMND_SAMPLINGCURRENT "|"
   D_CMND_SAMPLINGVOLTAGE "|"
   D_CMND_CAFEPLUGSTATUS "|"
@@ -752,6 +754,8 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestPower,
+
+  &CmndPlugToggle,
   &CmndSamplingCurrent,
   &CmndSamplingVoltage,
   &CmndCafePlugStatus,
@@ -765,9 +769,11 @@ void (* const AdcCommand[])(void) PROGMEM = {
 struct {
   int current_pin = A0;
   int voltage_pin = A3;
+  int toggle_pin = T0;
 } esp32_pin;
 
 struct {
+  bool toggle = false;
   double current = 0.0;
   double voltage = 0.0;
   double power = 0.0;
@@ -798,8 +804,7 @@ double ReadCalVoltage(int raw) {
   if (raw < 1 || raw > 4095) {
     return 0;
   }
-  return -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2)
-  + 0.001109019271794 * raw + 0.034143524634089;
+  return -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2) + 0.001109019271794 * raw + 0.034143524634089;
 
   /*
   return -0.000000000009824 * pow(raw,3) + 0.000000016557283 * pow(raw,2) + 0.000854596860691 * raw + 0.065440348345433;
@@ -891,6 +896,27 @@ void CmndTestPower(void) {
   Response_P(PSTR("{\"%s\":%f, "), "current", PowerStatus.current);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
   ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
+}
+
+void CmndPlugToggle(void) {
+  pinMode(esp32_pin.toggle_pin, OUTPUT);
+  
+  Response_P(PSTR("{\"%s\":"), "toggle");
+  if(XdrvMailbox.payload == 0) {
+    if(!PowerStatus.toggle) {
+      digitalWrite(esp32_pin.toggle_pin, HIGH);
+      PowerStatus.toggle = true;
+    }
+    ResponseAppend_P(PSTR("\"%s\"}"), "ON");
+  } else if(XdrvMailbox.payload == 1) {
+    if(PowerStatus.toggle) {
+      digitalWrite(esp32_pin.toggle_pin, LOW);
+      PowerStatus.toggle = false;
+    }
+    ResponseAppend_P(PSTR("\"%s\"}"), "OFF");
+  } else {
+    ResponseAppend_P(PSTR("\"%s\"}"), "Unknown Command");
+  }
 }
 
 void CmndSamplingCurrent(void) {
