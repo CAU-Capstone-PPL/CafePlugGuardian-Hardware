@@ -794,7 +794,6 @@
 // new Commands for Sampling Analog
 #ifdef FIRMWARE_SAMPLINGCURRENT
   #define D_CMND_TESTCOMMAND "TestCommand"
-  #define D_CMND_TESTSIZE "TestSize"
   #define D_CMND_TESTPOWER "TestPower"
 
   #define D_CMND_SAMPLINGCURRENT "SamplingCurrent"

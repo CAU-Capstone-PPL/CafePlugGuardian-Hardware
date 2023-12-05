@@ -741,7 +741,6 @@ void AdcShow(bool json) {
 const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
-  D_CMND_TESTSIZE "|"
   D_CMND_TESTPOWER "|"
   D_CMND_SAMPLINGCURRENT "|"
   D_CMND_CAFEPLUGSTATUS "|"
@@ -751,7 +750,6 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
-  &CmndTestSize,
   &CmndTestPower,
   &CmndSamplingCurrent,
   &CmndCafePlugStatus,
@@ -759,69 +757,89 @@ void (* const AdcCommand[])(void) PROGMEM = {
   &CmndAdcParam };
 
 #ifdef FIRMWARE_SAMPLINGCURRENT
+#define _USE_MATH_DEFINES
 #include "TimerInterrupt_Generic.h"
 
-#define _USE_MATH_DEFINES
+struct {
+  int current_pin = A0;
+  int voltage_pin = A3;
+} esp32_pin;
 
 struct {
-  float current = 0.0;
-  float voltage = 0.0;
-  float power = 0.0;
-  float total_power = 0.0;
+  double current = 0.0;
+  double voltage = 0.0;
+  double power = 0.0;
+  double total_power = 0.0;
 } PowerStatus;
 
 struct {
-  float offsetVolt = 5.0;
-  float analogRange = 4095.0;
-  float halfRange = 2047.0;
-  float acs712_amp = 0.185;
+  double offset5V = 5.0;
+  double offset3V = 3.3;
+  double r1 = 4960.0;
+  double r2 = 9940.0;
+  double acs712_amp = 0.185;
+  double zmpt101b_amp = 500.0;
 } CalSample;
 
+ESP32Timer ITimer0(0);
 bool initialTimer0 = true;
-volatile bool endTimer0 = false;
-
 volatile int timerCount = 0;
-int filterCount = 500;
 
-volatile float filter = 0;
-float tau = 0;
+int samplingCurrentRawBuffer[1000];
 
-float Acs712Current(int raw) {
-  float adc_voltage = raw * (CalSample.offsetVolt / CalSample.analogRange);
-  float current = (adc_voltage - CalSample.offsetVolt / 2) / CalSample.acs712_amp;
+double ReadCalVoltage(int raw) {
+  if (raw < 1 || raw > 4095) {
+    return 0;
+  }
+  return -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2)
+  + 0.001109019271794 * raw + 0.034143524634089;
+
+  /*
+  return -0.000000000009824 * pow(raw,3) + 0.000000016557283 * pow(raw,2) + 0.000854596860691 * raw + 0.065440348345433;
+  */
+}
+
+double Acs712Current(int raw) {
+  double adc_voltage = ReadCalVoltage(raw);
+  double voltage5 = adc_voltage * ((r1 + r2) / r2) * (5.0 / CalSample.offset5V);
+
+  double current = (voltage5 - 2.5) / CalSample.acs712_amp;
 
   return current;
 }
 
-float Zmpt101bVoltage(int raw) {
-  float voltage = (raw - CalSample.halfRange) / 4.0;
+double Zmpt101bVoltage(int raw) {
+  double adc_voltage = ReadCalVoltage(raw);
+  double voltage5 = adc_voltage * (5.0 / CalSample.offset3V);
+
+  double voltage = (voltage5 - 2.5) * CalSample.zmpt101b_amp;
 
   return voltage;
 }
 
 void MeasurePower(void) {
   int samples = 0;
-  float currentSquareSum = 0.0;
-  float voltageSquareSum = 0.0;
-  float sumVI = 0.0;
+  double currentSquareSum = 0.0;
+  double voltageSquareSum = 0.0;
+  double sumVI = 0.0;
 
   uint32_t start = micros();
   while (micros() - start < 1000000) {
     samples++;
-    int currentRaw = analogRead(A0);
-    int voltageRaw = analogRead(39);
+    int currentRaw = analogRead(acs712_pin.current_pin);
+    int voltageRaw = analogRead(acs712_pin.voltage_pin);
 
-    float current = Acs712Current(currentRaw);
-    float voltage = Zmpt101bVoltage(voltageRaw);
+    double current = Acs712Current(currentRaw);
+    double voltage = Zmpt101bVoltage(voltageRaw);
 
     currentSquareSum += current * current;
     voltageSquareSum += voltage * voltage;
     sumVI += current * voltage;
   }
 
-  float currentRMS = sqrt(currentSquareSum / samples);
-  float voltageRMS = sqrt(voltageSquareSum / samples);
-  float powerFactor = 1.0; //임시로 역률 1로 고정
+  double currentRMS = sqrt(currentSquareSum / samples);
+  double voltageRMS = sqrt(voltageSquareSum / samples);
+  double powerFactor = 1.0; //임시로 역률 1로 고정
 
   PowerStatus.current = currentRMS;
   PowerStatus.voltage = voltageRMS;
@@ -829,32 +847,12 @@ void MeasurePower(void) {
 }
 
 bool IRAM_ATTR SamplingCurrent(void * timerNo) {
-  int count = timerCount++;
+  int count = timerCount;
 
-  if (count <= 499 + filterCount) {
-    int currentRaw = analogRead(A0);
-    float current = Acs712Current(currentRaw);
-
-    if (filterCount != 0) {
-      if (count == 0) {
-        filter = current;
-      } else {
-        filter = (tau * filter + 0.0005 * current) / (tau + 0.0005);
-      }
-    }
-
-    if (count >= filterCount) {
-      if (count == filterCount) {
-        ResponseAppend_P(PSTR("%f"), current);
-      } else {
-        ResponseAppend_P(PSTR(",%f"), current);
-      }
-    }
-
-    if(count >= 499 + filterCount) {
-      endTimer0 = true;
-    }
+  if (count >= 0 || count < 1000) {
+    samplingCurrentRawBuffer[count] = analogRead(esp32_pin.current_pin);
   }
+  timerCount++;
 
   return true;
 }
@@ -862,24 +860,6 @@ bool IRAM_ATTR SamplingCurrent(void * timerNo) {
 void CmndTestCommand(void) {
   Response_P(PSTR("{\"%s\":"), "key");
   ResponseAppend_P(PSTR("%d}"), 1);
-}
-
-void CmndTestSize(void) {
-  int32_t payload = XdrvMailbox.payload;
-
-  if (0 == XdrvMailbox.index) {
-    payload = 1;
-  }
-
-  Response_P(PSTR("{\"%s\":["), "current");
-  for(int i = 0; i < payload; i++) {
-    if(i == 0) {
-      ResponseAppend_P(PSTR("%d"), 1);
-    } else {
-      ResponseAppend_P(PSTR(",%d"), i + 1);
-    }
-  }
-  ResponseAppend_P(PSTR("]}"));
 }
 
 void CmndTestPower(void) {
@@ -890,29 +870,54 @@ void CmndTestPower(void) {
 }
 
 void CmndSamplingCurrent(void) {
-  ESP32Timer ITimer0(0);
+  double tau = 0.0;
+  int filterCount = 0;
 
   if(XdrvMailbox.payload > 0) {
-    filterCount = 500;
-    int32_t cutoff = XdrvMailbox.payload;
+    int cutfoff = XdrvMailbox.payload;
     tau = 1 / (2 * M_PI * cutoff);
-  } else {
-    filterCount = 0;
+    filterCount = 500;
   }
+
   timerCount = 0;
-  endTimer0 = false;
 
+  if(initialTimer0) {
+    initialTimer0 = false;
+    ITimer0.attachInterruptInterval(500, SamplingCurrent);
+  } else {
+    ITimer0.restartTimer();
+  }
+
+  while(true) {
+    if(timerCount >= filterCount + 500) {
+      ITimer0.stopTimer();
+      break;
+    }
+  }
+
+  double filter = 0.0;
   Response_P(PSTR("{\"%s\":["), "current");
+  for(int i = 0; i < filterCount + 500; i++) {
+    double current = Acs712Current(samplingCurrentRawBuffer[i]);
+    samplingCurrentRawBuffer[i] = 0;
 
-  if(ITimer0.attachInterruptInterval(500, SamplingCurrent)) {
-    while(true) {
-      if(endTimer0) {
-        ITimer0.stopTimer();
-        break;
+    if(filterCount > 0) {
+      if(i == 0) {
+        filter = current;
+      } else {
+        filter = (tau * filter + 0.0005 * current) / (tau + 0.0005);
+        current = filter;
+      }
+    }
+
+    if(i >= filterCount) {
+      if(i == filterCount) {
+        ResponseAppend_P(PSTR("%f"), current);
+      } else {
+        ResponseAppend_P(PSTR(",%f"), current);
       }
     }
   }
-  
   ResponseAppend_P(PSTR("]}"));
 }
 
