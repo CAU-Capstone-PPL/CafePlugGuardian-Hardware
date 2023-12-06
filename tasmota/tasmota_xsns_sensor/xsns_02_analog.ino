@@ -742,6 +742,7 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTPOWER "|"
+  D_CMND_CALSENSITIVE "|"
 
   D_CMND_PLUGTOGGLE "|"
   D_CMND_SAMPLINGCURRENT "|"
@@ -754,6 +755,7 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestPower,
+  &CmndCalSensitive,
 
   &CmndPlugToggle,
   &CmndSamplingCurrent,
@@ -781,10 +783,11 @@ struct {
 } PowerStatus;
 
 struct {
-  double offset5V = 5.06;
-  double offset3V = 3.3;
+  double offset5V = 5.07;
+  double offset3V = 3.28;
   double r1 = 4960.0;
-  double r2 = 9920.0;
+  double r2 = 9940.0;
+  double sensitive = 1.0;
   double acs712_amp = 0.185;
   double zmpt101b_amp = 500.0;
   int multi_sample = 1;
@@ -804,11 +807,11 @@ double ReadCalVoltage(int raw) {
   if (raw < 1 || raw > 4095) {
     return 0;
   }
-  return -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2) + 0.001109019271794 * raw + 0.034143524634089;
+  double cal = -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2) + 0.001109019271794 * raw + 0.034143524634089;
+  //double cal = -0.000000000009824 * pow(raw,3) + 0.000000016557283 * pow(raw,2) + 0.000854596860691 * raw + 0.065440348345433;
+  cal *= CalSample.sensitive;
 
-  /*
-  return -0.000000000009824 * pow(raw,3) + 0.000000016557283 * pow(raw,2) + 0.000854596860691 * raw + 0.065440348345433;
-  */
+  return cal;
 }
 
 double Acs712Current(int raw) {
@@ -898,6 +901,17 @@ void CmndTestPower(void) {
   ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
 }
 
+void CmndCalSensitive(void) {
+  if(XdrvMailbox.payload == 1) {
+    CalSample.sensitive += 0.005;
+  } else if(XdrvMailbox.payload == 0) {
+    CalSample.sensitive -= 0.005;
+  }
+
+  Response_P(PSTR("{\"%s\":"), "sensitive");
+  ResponseAppend_P(PSTR("%f}"), CalSample.sensitive);
+}
+
 void CmndPlugToggle(void) {
   pinMode(esp32_pin.toggle_pin, OUTPUT);
 
@@ -909,7 +923,7 @@ void CmndPlugToggle(void) {
     digitalWrite(esp32_pin.toggle_pin, LOW);
     PowerStatus.toggle = false;
   }
-  ResponseAppend_P(PSTR("\"%d\"}"), PowerStatus.toggle);
+  ResponseAppend_P(PSTR("\"%s\"}"), PowerStatus.toggle ? "ON" : "OFF");
 }
 
 void CmndSamplingCurrent(void) {
