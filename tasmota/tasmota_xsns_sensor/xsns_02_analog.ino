@@ -829,14 +829,14 @@ double Zmpt101bVoltage(int raw) {
   return voltage;
 }
 
-void MeasurePower(void) {
+void MeasurePowerEverySecond(void) {
   int samples = 0;
   double currentSquareSum = 0.0;
   double voltageSquareSum = 0.0;
   double sumVI = 0.0;
 
   uint32_t start = micros();
-  while (micros() - start < 1000000) {
+  while (micros() - start < 100000) {
     samples++;
     int currentRaw = analogRead(esp32_pin.current_pin);
     int voltageRaw = analogRead(esp32_pin.voltage_pin);
@@ -892,7 +892,7 @@ void CmndTestCommand(void) {
 }
 
 void CmndTestPower(void) {
-  MeasurePower();
+  MeasurePowerEverySecond();
   Response_P(PSTR("{\"%s\":%f, "), "current", PowerStatus.current);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
   ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
@@ -1193,6 +1193,7 @@ bool Xsns02(uint32_t function) {
 #endif  // USE_RULES
           case FUNC_EVERY_SECOND:
             AdcEverySecond();
+            MeasurePowerEverySecond();
             break;
           case FUNC_JSON_APPEND:
             AdcShow(1);

@@ -6,19 +6,37 @@
 //  #define USER_TEMPLATE "{\"NAME\":\"SamplingCurrent\",\"GPIO\":[0,0,0,3104,0,32,0,0,224,576,0,0,0,0],\"FLAG\":0,\"BASE\":18}"
 
 // -- MQTT ----------------------------------------
-  #undef  MQTT_HOST
+  #ifdef  MQTT_HOST
+    #undef  MQTT_HOST
+  #endif
   #define MQTT_HOST         ""                // [MqttHost]
 
-  #undef  MQTT_PORT
+  #ifdef  MQTT_PORT
+    #undef  MQTT_PORT
+  #endif
   #define MQTT_PORT         1883
 
 // -- MQTT - Telemetry ----------------------------
-  #undef  TELE_PERIOD
-  #define TELE_PERIOD       10               // [TelePeriod] Telemetry (0 = disable, 10 - 3600 seconds)
+  #ifdef  TELE_PERIOD
+    #undef  TELE_PERIOD
+  #endif
+  #define TELE_PERIOD       0               // [TelePeriod] Telemetry (0 = disable, 10 - 3600 seconds)
 
 // -- Rules or Script  ----------------------------
-  #undef USER_RULE1
-  #define USER_RULE1 "Rule1 ON CafePlugStatus#current>0.3 DO SamplingCurrent 20000 ENDON"
+  #ifdef  USE_ADC
+    #undef USE_ADC
+  #endif
+  #define USE_ADC
+
+  #ifdef  USE_RULES
+    #undef USE_RULES
+  #endif
+  #define USE_RULES
+
+  #ifdef  USER_RULE1
+    #undef USER_RULE1
+  #endif
+//#define USER_RULE1 "Rule1 ON CafePlugStatus#current>0.3 DO SamplingCurrent 20000 ENDON"
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
