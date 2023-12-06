@@ -902,21 +902,14 @@ void CmndPlugToggle(void) {
   pinMode(esp32_pin.toggle_pin, OUTPUT);
 
   Response_P(PSTR("{\"%s\":"), "toggle");
-  if(XdrvMailbox.payload == 0) {
-    if(!PowerStatus.toggle) {
-      digitalWrite(esp32_pin.toggle_pin, HIGH);
-      PowerStatus.toggle = true;
-    }
-    ResponseAppend_P(PSTR("\"%s\"}"), "ON");
-  } else if(XdrvMailbox.payload == 1) {
-    if(PowerStatus.toggle) {
-      digitalWrite(esp32_pin.toggle_pin, LOW);
-      PowerStatus.toggle = false;
-    }
-    ResponseAppend_P(PSTR("\"%s\"}"), "OFF");
-  } else {
-    ResponseAppend_P(PSTR("\"%s\"}"), "Unknown Command");
+  if(XdrvMailbox.payload == 1) {
+    digitalWrite(esp32_pin.toggle_pin, HIGH);
+    PowerStatus.toggle = true;
+  } else if(XdrvMailbox.payload == 0) {
+    digitalWrite(esp32_pin.toggle_pin, LOW);
+    PowerStatus.toggle = false;
   }
+  ResponseAppend_P(PSTR("\"%d\"}"), PowerStatus.toggle);
 }
 
 void CmndSamplingCurrent(void) {
@@ -1193,7 +1186,6 @@ bool Xsns02(uint32_t function) {
 #endif  // USE_RULES
           case FUNC_EVERY_SECOND:
             AdcEverySecond();
-            MeasurePowerEverySecond();
             break;
           case FUNC_JSON_APPEND:
             AdcShow(1);
