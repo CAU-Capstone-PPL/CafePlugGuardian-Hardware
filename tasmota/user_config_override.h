@@ -14,7 +14,11 @@
 
 // -- MQTT - Telemetry ----------------------------
   #undef  TELE_PERIOD
-  #define TELE_PERIOD       0               // [TelePeriod] Telemetry (0 = disable, 10 - 3600 seconds)
+  #define TELE_PERIOD       10               // [TelePeriod] Telemetry (0 = disable, 10 - 3600 seconds)
+
+// -- Rules or Script  ----------------------------
+  #undef USER_RULE1
+  #define USER_RULE1 "Rule1 ON CafePlugStatus#current>0.3 DO SamplingCurrent 20000 ENDON"
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_

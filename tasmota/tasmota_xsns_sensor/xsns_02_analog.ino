@@ -854,7 +854,7 @@ void MeasurePower(void) {
   double powerFactor = 1.0; //임시로 역률 1로 고정
 
   PowerStatus.current = currentRMS;
-  PowerStatus.voltage = voltageRMS;
+  PowerStatus.voltage = voltageRMS; //오차 보정 못하면 220 고정 예정
   PowerStatus.power = currentRMS * voltageRMS * powerFactor;
 }
 
@@ -900,7 +900,7 @@ void CmndTestPower(void) {
 
 void CmndPlugToggle(void) {
   pinMode(esp32_pin.toggle_pin, OUTPUT);
-  
+
   Response_P(PSTR("{\"%s\":"), "toggle");
   if(XdrvMailbox.payload == 0) {
     if(!PowerStatus.toggle) {
@@ -1036,7 +1036,9 @@ void CmndSamplingVoltage(void) {
 }
 
 void CmndCafePlugStatus(void) {
-  
+  Response_P(PSTR("{\"%s\":%f, "), "current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
 }
 #endif
 
