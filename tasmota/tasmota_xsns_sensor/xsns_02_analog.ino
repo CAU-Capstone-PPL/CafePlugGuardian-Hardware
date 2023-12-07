@@ -807,11 +807,11 @@ double ReadCalVoltage(int raw) {
   if (raw < 1 || raw > 4095) {
     return 0;
   }
-  double cal = -0.000000000000016 * pow(raw,4) + 0.000000000118171 * pow(raw,3) - 0.000000301211691 * pow(raw,2) + 0.001109019271794 * raw + 0.034143524634089;
-  //double cal = -0.000000000009824 * pow(raw,3) + 0.000000016557283 * pow(raw,2) + 0.000854596860691 * raw + 0.065440348345433;
-  cal *= CalSample.sensitive;
+  double cal = raw * CalSample.sensitive;
+  double volt = -0.000000000000016 * pow(cal,4) + 0.000000000118171 * pow(cal,3) - 0.000000301211691 * pow(cal,2) + 0.001109019271794 * cal + 0.034143524634089;
+  //double volt = -0.000000000009824 * pow(cal,3) + 0.000000016557283 * pow(cal,2) + 0.000854596860691 * cal + 0.065440348345433;
 
-  return cal;
+  return volt;
 }
 
 double Acs712Current(int raw) {
