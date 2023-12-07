@@ -30,7 +30,7 @@
   #ifdef  USER_RULE1
     #undef USER_RULE1
   #endif
-  #define USER_RULE1 "ON system#boot DO RuleTimer1 5 ENDON ON Rules#Timer=1 DO Backlog publish cmnd/%%topic%%/TestPower; RuleTimer1 5 ENDON"
+  #define USER_RULE1 "ON system#boot DO RuleTimer1 5 ENDON ON Rules#Timer=1 DO Backlog publish cmnd/%%topic%%/MeasurePower; RuleTimer1 5 ENDON"
 
   #ifdef  USE_ADC
     #undef USE_ADC

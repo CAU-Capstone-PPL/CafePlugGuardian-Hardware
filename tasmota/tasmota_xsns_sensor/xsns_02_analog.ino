@@ -742,12 +742,13 @@ const char kAdcCommands[] PROGMEM = "|"  // No prefix
 #ifdef FIRMWARE_SAMPLINGCURRENT
   D_CMND_TESTCOMMAND "|"
   D_CMND_TESTPOWER "|"
+  
+  D_CMND_CAFEPLUGSTATUS "|"
+  D_CMND_MEASUREPOWER "|"
   D_CMND_CALSENSITIVE "|"
-
   D_CMND_PLUGTOGGLE "|"
   D_CMND_SAMPLINGCURRENT "|"
   D_CMND_SAMPLINGVOLTAGE "|"
-  D_CMND_CAFEPLUGSTATUS "|"
 #endif
   D_CMND_ADCPARAM;
 
@@ -755,12 +756,13 @@ void (* const AdcCommand[])(void) PROGMEM = {
 #ifdef FIRMWARE_SAMPLINGCURRENT
   &CmndTestCommand,
   &CmndTestPower,
-  &CmndCalSensitive,
 
+  &CmndCafePlugStatus,
+  &CmndMeasurePower,
+  &CmndCalSensitive,
   &CmndPlugToggle,
   &CmndSamplingCurrent,
   &CmndSamplingVoltage,
-  &CmndCafePlugStatus,
 #endif
   &CmndAdcParam };
 
@@ -779,16 +781,24 @@ struct {
   double current = 0.0;
   double voltage = 0.0;
   double power = 0.0;
-  double total_power = 0.0;
   double avg_current = 0.0;
   double avg_voltage = 0.0;
 } PowerStatus;
 
 struct {
-  double offset5V = 4.98;
-  double offset3V = 3.26;
+  bool test_toggle = false;
+  double test_current = 0.0;
+  double test_voltage = 0.0;
+  double test_power = 0.0;
+  double test_avg_current = 0.0;
+  double test_avg_voltage = 0.0;
+} TestPowerStatus;
+
+struct {
+  double offset5V = 5.0;
+  double offset3V = 3.3;
   double r1 = 4960.0;
-  double r2 = 9940.0;
+  double r2 = 9950.0;
   double sensitive = 1.0;
   double current_sensitive = 1.0;
   double voltage_sensitive = 1.0;
@@ -841,14 +851,20 @@ void MeasurePowerEverySecond(void) {
   double currentSquareSum = 0.0;
   double voltageSquareSum = 0.0;
 
-  PowerStatus.avg_current = 0.0;
-  PowerStatus.avg_voltage = 0.0;
+  TestPowerStatus.test_avg_current = 0.0;
+  TestPowerStatus.test_avg_voltage = 0.0;
 
   uint32_t start = micros();
   while (micros() - start < 1000000) {
     samples++;
-    int currentRaw = analogRead(esp32_pin.current_pin);
-    int voltageRaw = analogRead(esp32_pin.voltage_pin);
+    int currentRaw;
+    int voltageRaw;
+    for(int i = 0; i < 4; i++) {
+      currentRaw += analogRead(esp32_pin.current_pin);
+      voltageRaw += analogRead(esp32_pin.voltage_pin);
+    }
+    currentRaw /= 4;
+    voltageRaw /= 4;
 
     double current = Acs712Current(currentRaw);
     double voltage = Zmpt101bVoltage(voltageRaw);
@@ -856,20 +872,28 @@ void MeasurePowerEverySecond(void) {
     currentSquareSum += current * current;
     voltageSquareSum += voltage * voltage;
 
-    PowerStatus.avg_current += current;
-    PowerStatus.avg_voltage += voltage;
+    TestPowerStatus.test_avg_current += current;
+    TestPowerStatus.test_avg_voltage += voltage;
   }
 
   double currentRMS = sqrt(currentSquareSum / samples);
   double voltageRMS = sqrt(voltageSquareSum / samples);
   double powerFactor = 1.0; //임시로 역률 1로 고정
 
-  PowerStatus.current = currentRMS;
-  PowerStatus.voltage = voltageRMS; //오차 보정 못하면 220 고정 예정
-  PowerStatus.power = currentRMS * voltageRMS * powerFactor;
+  if(PowerStatus.toggle) {
+    PowerStatus.current = currentRMS;
+  } else {
+    PowerStatus.current = 0;
+  }
+  PowerStatus.voltage = 220.0;
+  PowerStatus.power = PowerStatus.current * PowerStatus.voltage * powerFactor;
 
-  PowerStatus.avg_current /= samples;
-  PowerStatus.avg_voltage /= samples;
+  TestPowerStatus.test_current = currentRMS;
+  TestPowerStatus.test_voltage = voltageRMS; //오차 보정 못하면 220 고정 예정
+  TestPowerStatus.test_power = TestPowerStatus.test_current * TestPowerStatus.test_voltage;
+
+  TestPowerStatus.test_avg_current /= samples;
+  TestPowerStatus.test_avg_voltage /= samples;
 }
 
 bool IRAM_ATTR SamplingCurrent(void * timerNo) {
@@ -906,14 +930,27 @@ void CmndTestCommand(void) {
 }
 
 void CmndTestPower(void) {
-  MeasurePowerEverySecond();
-  Response_P(PSTR("{\"%s\":%d, "), "toggle", PowerStatus.toggle);
-  ResponseAppend_P(PSTR("\"%s\":%f, "), "current", PowerStatus.current);
-  ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
-  ResponseAppend_P(PSTR("\"%s\":%f, "), "power", PowerStatus.power);
+  Response_P(PSTR("{\"%s\":%s, "), "test_toggle", TestPowerStatus.test_toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_current", TestPowerStatus.test_current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_voltage", TestPowerStatus.test_voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_power", TestPowerStatus.test_power);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_avg_current", TestPowerStatus.test_avg_current);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "test_avg_voltage", TestPowerStatus.test_avg_voltage);
+}
 
-  ResponseAppend_P(PSTR("\"%s\":%f, "), "avg_current", PowerStatus.avg_current);
-  ResponseAppend_P(PSTR("\"%s\":%f}"), "avg_voltage", PowerStatus.avg_voltage);
+void CmndCafePlugStatus(void) {
+  Response_P(PSTR("{\"%s\":%s, "), "status_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "status_current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "status_voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "status_power", PowerStatus.power);
+}
+
+void CmndMeasurePower(void) {
+  MeasurePowerEverySecond();
+  Response_P(PSTR("{\"%s\":%s, "), "measure_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "measure_power", PowerStatus.power);
 }
 
 void CmndCalSensitive(void) {
@@ -946,9 +983,11 @@ void CmndPlugToggle(void) {
   if(XdrvMailbox.payload == 1) {
     digitalWrite(esp32_pin.toggle_pin, HIGH);
     PowerStatus.toggle = true;
+    TestPowerStatus.test_toggle = true;
   } else if(XdrvMailbox.payload == 0) {
     digitalWrite(esp32_pin.toggle_pin, LOW);
     PowerStatus.toggle = false;
+    TestPowerStatus.test_toggle = false;
   }
   ResponseAppend_P(PSTR("\"%s\"}"), PowerStatus.toggle ? "ON" : "OFF");
 }
@@ -1067,12 +1106,6 @@ void CmndSamplingVoltage(void) {
     }
   }
   ResponseAppend_P(PSTR("]}"));
-}
-
-void CmndCafePlugStatus(void) {
-  Response_P(PSTR("{\"%s\":%f, "), "current", PowerStatus.current);
-  ResponseAppend_P(PSTR("\"%s\":%f, "), "voltage", PowerStatus.voltage);
-  ResponseAppend_P(PSTR("\"%s\":%f}"), "power", PowerStatus.power);
 }
 #endif
 
