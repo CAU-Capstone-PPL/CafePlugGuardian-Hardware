@@ -30,7 +30,7 @@
   #ifdef  USER_RULE1
     #undef USER_RULE1
   #endif
-//#define USER_RULE1 "Rule1 ON CafePlugStatus#current>0.3 DO SamplingCurrent 20000 ENDON"
+  #define USER_RULE1 "ON system#boot DO RuleTimer1 5 ENDON ON Rules#Timer=1 DO Backlog publish cmnd/%%topic%%/TestPower; RuleTimer1 5 ENDON"
 
   #ifdef  USE_ADC
     #undef USE_ADC
