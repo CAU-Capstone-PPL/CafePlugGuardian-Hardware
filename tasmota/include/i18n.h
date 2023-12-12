@@ -791,6 +791,19 @@
 
 // Commands xsns_02_analog.ino
 #define D_CMND_ADCPARAM "AdcParam"
+// new Commands for Sampling Analog
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  #define D_CMND_TESTCOMMAND "TestCommand"
+  #define D_CMND_TESTPOWER "TestPower"
+
+  #define D_CMND_CAFEPLUGSTATUS "CafePlugStatus"
+  #define D_CMND_MEASUREPOWER "MeasurePower"
+  #define D_CMND_CALSENSITIVE "CalSensitive"
+  #define D_CMND_PLUGTOGGLE "PlugToggle"
+  #define D_CMND_SAMPLINGCURRENT "SamplingCurrent"
+  #define D_CMND_SAMPLINGVOLTAGE "SamplingVoltage"
+  
+#endif
 
 // Commands xsns_05_ds18x20.ino
 #define D_CMND_DS_ALIAS "Alias"

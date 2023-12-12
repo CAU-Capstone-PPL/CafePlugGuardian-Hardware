@@ -22,6 +22,14 @@
 
 #ifdef ESP32
 
+#ifdef FIRMWARE_SAMPLINGCURRENT
+
+#ifndef CODE_IMAGE_STR
+  #define CODE_IMAGE_STR "sampleCurrent"
+#endif
+
+#endif
+
 /*********************************************************************************************\
  * [tasmota32x-safeboot.bin]
  * Provide an image with useful supported sensors enabled

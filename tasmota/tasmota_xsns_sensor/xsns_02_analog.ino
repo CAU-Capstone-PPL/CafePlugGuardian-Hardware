@@ -739,10 +739,375 @@ void AdcShow(bool json) {
 \*********************************************************************************************/
 
 const char kAdcCommands[] PROGMEM = "|"  // No prefix
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  D_CMND_TESTCOMMAND "|"
+  D_CMND_TESTPOWER "|"
+  
+  D_CMND_CAFEPLUGSTATUS "|"
+  D_CMND_MEASUREPOWER "|"
+  D_CMND_CALSENSITIVE "|"
+  D_CMND_PLUGTOGGLE "|"
+  D_CMND_SAMPLINGCURRENT "|"
+  D_CMND_SAMPLINGVOLTAGE "|"
+#endif
   D_CMND_ADCPARAM;
 
 void (* const AdcCommand[])(void) PROGMEM = {
+#ifdef FIRMWARE_SAMPLINGCURRENT
+  &CmndTestCommand,
+  &CmndTestPower,
+
+  &CmndCafePlugStatus,
+  &CmndMeasurePower,
+  &CmndCalSensitive,
+  &CmndPlugToggle,
+  &CmndSamplingCurrent,
+  &CmndSamplingVoltage,
+#endif
   &CmndAdcParam };
+
+#ifdef FIRMWARE_SAMPLINGCURRENT
+#define _USE_MATH_DEFINES
+#include "TimerInterrupt_Generic.h"
+
+struct {
+  int current_pin = A0;
+  int voltage_pin = A3;
+  int toggle_pin = T0;
+} esp32_pin;
+
+struct {
+  bool toggle = false;
+  double current = 0.0;
+  double voltage = 0.0;
+  double power = 0.0;
+  double avg_current = 0.0;
+  double avg_voltage = 0.0;
+} PowerStatus;
+
+struct {
+  bool test_toggle = false;
+  double test_current = 0.0;
+  double test_voltage = 0.0;
+  double test_power = 0.0;
+  double test_avg_current = 0.0;
+  double test_avg_voltage = 0.0;
+} TestPowerStatus;
+
+struct {
+  double offset5V = 5.0;
+  double offset3V = 3.3;
+  double r1 = 4960.0;
+  double r2 = 9950.0;
+  double sensitive = 1.0;
+  double current_sensitive = 1.0;
+  double voltage_sensitive = 1.0;
+  double acs712_amp = 0.185;
+  double zmpt101b_amp = 400.0;
+  int multi_sample = 1;
+} CalSample;
+
+ESP32Timer ITimer0(0);
+bool initialTimer0 = true;
+ESP32Timer ITimer1(1);
+bool initialTimer1 = true;
+
+volatile int timerCount = 0;
+
+int samplingCurrentRawBuffer[1000];
+int samplingVoltageRawBuffer[1000];
+
+double ReadCalVoltage(int raw) {
+  if (raw < 1 || raw > 4095) {
+    return 0;
+  }
+  double cal = raw * CalSample.sensitive;
+  double volt = -0.000000000000016 * pow(cal,4) + 0.000000000118171 * pow(cal,3) - 0.000000301211691 * pow(cal,2) + 0.001109019271794 * cal + 0.034143524634089;
+  //double volt = -0.000000000009824 * pow(cal,3) + 0.000000016557283 * pow(cal,2) + 0.000854596860691 * cal + 0.065440348345433;
+
+  return volt;
+}
+
+double Acs712Current(int raw) {
+  double adc_voltage = ReadCalVoltage(raw) * CalSample.current_sensitive;
+  double voltage5 = adc_voltage * ((CalSample.r1 + CalSample.r2) / CalSample.r2) * (5.0 / CalSample.offset5V);
+
+  double current = (voltage5 - 2.5) / CalSample.acs712_amp;
+
+  return current;
+}
+
+double Zmpt101bVoltage(int raw) {
+  double adc_voltage = ReadCalVoltage(raw) * CalSample.voltage_sensitive;
+  double voltage5 = adc_voltage * (5.0 / CalSample.offset3V);
+
+  double voltage = (voltage5 - 2.5) * CalSample.zmpt101b_amp;
+
+  return voltage;
+}
+
+void MeasurePowerEverySecond(void) {
+  int samples = 0;
+  double currentSquareSum = 0.0;
+  double voltageSquareSum = 0.0;
+
+  TestPowerStatus.test_avg_current = 0.0;
+  TestPowerStatus.test_avg_voltage = 0.0;
+
+  uint32_t start = micros();
+  while (micros() - start < 1000000) {
+    samples++;
+    int currentRaw = 0;
+    int voltageRaw = 0;
+    for(int i = 0; i < 4; i++) {
+      currentRaw += analogRead(esp32_pin.current_pin);
+      voltageRaw += analogRead(esp32_pin.voltage_pin);
+    }
+    currentRaw /= 4;
+    voltageRaw /= 4;
+
+    double current = Acs712Current(currentRaw);
+    double voltage = Zmpt101bVoltage(voltageRaw);
+
+    currentSquareSum += current * current;
+    voltageSquareSum += voltage * voltage;
+
+    TestPowerStatus.test_avg_current += current;
+    TestPowerStatus.test_avg_voltage += voltage;
+  }
+
+  double currentRMS = sqrt(currentSquareSum / samples);
+  double voltageRMS = sqrt(voltageSquareSum / samples);
+  double powerFactor = 1.0; //임시로 역률 1로 고정
+
+  if(PowerStatus.toggle) {
+    PowerStatus.current = currentRMS;
+  } else {
+    PowerStatus.current = 0;
+  }
+  PowerStatus.voltage = 220.0;
+  PowerStatus.power = PowerStatus.current * PowerStatus.voltage * powerFactor;
+
+  TestPowerStatus.test_current = currentRMS;
+  TestPowerStatus.test_voltage = voltageRMS; //오차 보정 못하면 220 고정 예정
+  TestPowerStatus.test_power = TestPowerStatus.test_current * TestPowerStatus.test_voltage;
+
+  TestPowerStatus.test_avg_current /= samples;
+  TestPowerStatus.test_avg_voltage /= samples;
+}
+
+bool IRAM_ATTR SamplingCurrent(void * timerNo) {
+  int count = timerCount;
+
+  if (count >= 0 || count < 1000) {
+    for(int i = 0; i < CalSample.multi_sample; i++) {
+      samplingCurrentRawBuffer[count] += analogRead(esp32_pin.current_pin);
+    }
+    samplingCurrentRawBuffer[count] /= CalSample.multi_sample;
+  }
+  timerCount++;
+
+  return true;
+}
+
+bool IRAM_ATTR SamplingVoltage(void * timerNo) {
+  int count = timerCount;
+
+  if (count >= 0 || count < 1000) {
+    for(int i = 0; i < CalSample.multi_sample; i++) {
+      samplingVoltageRawBuffer[count] += analogRead(esp32_pin.voltage_pin);
+    }
+    samplingVoltageRawBuffer[count] /= CalSample.multi_sample;
+  }
+  timerCount++;
+
+  return true;
+}
+
+void CmndTestCommand(void) {
+  Response_P(PSTR("{\"%s\":"), "key");
+  ResponseAppend_P(PSTR("%d}"), 1);
+}
+
+void CmndTestPower(void) {
+  Response_P(PSTR("{\"%s\":\"%s\", "), "test_toggle", TestPowerStatus.test_toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_current", TestPowerStatus.test_current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_voltage", TestPowerStatus.test_voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_power", TestPowerStatus.test_power);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "test_avg_current", TestPowerStatus.test_avg_current);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "test_avg_voltage", TestPowerStatus.test_avg_voltage);
+}
+
+void CmndCafePlugStatus(void) {
+  Response_P(PSTR("{\"%s\":\"%s\", "), "status_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "status_current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "status_voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "status_power", PowerStatus.power);
+}
+
+void CmndMeasurePower(void) {
+  MeasurePowerEverySecond();
+  Response_P(PSTR("{\"%s\":\"%s\", "), "measure_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_current", PowerStatus.current);
+  ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_voltage", PowerStatus.voltage);
+  ResponseAppend_P(PSTR("\"%s\":%f}"), "measure_power", PowerStatus.power);
+}
+
+void CmndCalSensitive(void) {
+  if(XdrvMailbox.payload == 0) {
+    CalSample.sensitive -= 0.001;
+  } else if(XdrvMailbox.payload == 1) {
+    CalSample.sensitive += 0.001;
+  } else if(XdrvMailbox.payload == 2) {
+    CalSample.current_sensitive -= 0.001;
+  } else if(XdrvMailbox.payload == 3) {
+    CalSample.current_sensitive += 0.001;
+  } else if(XdrvMailbox.payload == 4) {
+    CalSample.voltage_sensitive -= 0.001;
+  } else if(XdrvMailbox.payload == 5) {
+    CalSample.voltage_sensitive += 0.001;
+  }
+
+  Response_P(PSTR("{\"%s\":"), "sensitive");
+  ResponseAppend_P(PSTR("%f, "), CalSample.sensitive);
+  ResponseAppend_P(PSTR("\"%s\":"), "current_sensitive");
+  ResponseAppend_P(PSTR("%f, "), CalSample.current_sensitive);
+  ResponseAppend_P(PSTR("\"%s\":"), "voltage_sensitive");
+  ResponseAppend_P(PSTR("%f}"), CalSample.voltage_sensitive);
+}
+
+void CmndPlugToggle(void) {
+  pinMode(esp32_pin.toggle_pin, OUTPUT);
+
+  Response_P(PSTR("{\"%s\":"), "toggle");
+  if(XdrvMailbox.payload == 1) {
+    digitalWrite(esp32_pin.toggle_pin, HIGH);
+    PowerStatus.toggle = true;
+    TestPowerStatus.test_toggle = true;
+  } else if(XdrvMailbox.payload == 0) {
+    digitalWrite(esp32_pin.toggle_pin, LOW);
+    PowerStatus.toggle = false;
+    TestPowerStatus.test_toggle = false;
+  }
+  ResponseAppend_P(PSTR("\"%s\"}"), PowerStatus.toggle ? "ON" : "OFF");
+}
+
+void CmndSamplingCurrent(void) {
+  double tau = 0.0;
+  int filterCount = 0;
+  int payload = XdrvMailbox.payload;
+
+  CalSample.multi_sample = payload / 10000;
+  if(CalSample.multi_sample == 0) {
+    CalSample.multi_sample = 1;
+  }
+
+  if(payload % 10000 != 0) {
+    int cutoff = payload % 10000;
+    tau = 1 / (2 * M_PI * cutoff);
+    filterCount = 500;
+  }
+
+  timerCount = 0;
+
+  if(initialTimer0) {
+    initialTimer0 = false;
+    ITimer0.attachInterruptInterval(500, SamplingCurrent);
+  } else {
+    ITimer0.enableTimer();
+  }
+
+  while(true) {
+    if(timerCount >= filterCount + 500) {
+      ITimer0.disableTimer();
+      break;
+    }
+  }
+
+  double filter = 0.0;
+  Response_P(PSTR("{\"%s\":["), "current_sampling");
+  for(int i = 0; i < filterCount + 500; i++) {
+    double current = Acs712Current(samplingCurrentRawBuffer[i]);
+    samplingCurrentRawBuffer[i] = 0;
+
+    if(filterCount > 0) {
+      if(i == 0) {
+        filter = current;
+      } else {
+        filter = (tau * filter + 0.0005 * current) / (tau + 0.0005);
+        current = filter;
+      }
+    }
+
+    if(i >= filterCount) {
+      if(i == filterCount) {
+        ResponseAppend_P(PSTR("%f"), current);
+      } else {
+        ResponseAppend_P(PSTR(",%f"), current);
+      }
+    }
+  }
+  ResponseAppend_P(PSTR("]}"));
+}
+
+void CmndSamplingVoltage(void) {
+  double tau = 0.0;
+  int filterCount = 0;
+  int payload = XdrvMailbox.payload;
+
+  CalSample.multi_sample = payload / 10000;
+  if(CalSample.multi_sample == 0) {
+    CalSample.multi_sample = 1;
+  }
+
+  if(payload % 10000 != 0) {
+    int cutoff = payload % 10000;
+    tau = 1 / (2 * M_PI * cutoff);
+    filterCount = 500;
+  }
+
+  timerCount = 0;
+
+  if(initialTimer1) {
+    initialTimer1 = false;
+    ITimer1.attachInterruptInterval(500, SamplingVoltage);
+  } else {
+    ITimer1.enableTimer();
+  }
+
+  while(true) {
+    if(timerCount >= filterCount + 500) {
+      ITimer1.disableTimer();
+      break;
+    }
+  }
+
+  double filter = 0.0;
+  Response_P(PSTR("{\"%s\":["), "voltage_sampling");
+  for(int i = 0; i < filterCount + 500; i++) {
+    double voltage = Zmpt101bVoltage(samplingVoltageRawBuffer[i]);
+    samplingVoltageRawBuffer[i] = 0;
+
+    if(filterCount > 0) {
+      if(i == 0) {
+        filter = voltage;
+      } else {
+        filter = (tau * filter + 0.0005 * voltage) / (tau + 0.0005);
+        voltage = filter;
+      }
+    }
+
+    if(i >= filterCount) {
+      if(i == filterCount) {
+        ResponseAppend_P(PSTR("%f"), voltage);
+      } else {
+        ResponseAppend_P(PSTR(",%f"), voltage);
+      }
+    }
+  }
+  ResponseAppend_P(PSTR("]}"));
+}
+#endif
 
 void CmndAdcParam(void) {
   if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= MAX_ADCS)) {
