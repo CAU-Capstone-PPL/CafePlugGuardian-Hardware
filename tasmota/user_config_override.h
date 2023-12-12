@@ -2,9 +2,6 @@
 #define _USER_CONFIG_OVERRIDE_H_
 
 #ifdef FIRMWARE_SAMPLINGCURRENT
-//  #undef  USER_TEMPLATE
-//  #define USER_TEMPLATE "{\"NAME\":\"SamplingCurrent\",\"GPIO\":[0,0,0,3104,0,32,0,0,224,576,0,0,0,0],\"FLAG\":0,\"BASE\":18}"
-
 // -- MQTT ----------------------------------------
   #ifdef  MQTT_HOST
     #undef  MQTT_HOST
