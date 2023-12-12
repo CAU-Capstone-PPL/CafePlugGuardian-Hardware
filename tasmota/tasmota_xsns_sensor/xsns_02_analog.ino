@@ -857,8 +857,8 @@ void MeasurePowerEverySecond(void) {
   uint32_t start = micros();
   while (micros() - start < 1000000) {
     samples++;
-    int currentRaw;
-    int voltageRaw;
+    int currentRaw = 0;
+    int voltageRaw = 0;
     for(int i = 0; i < 4; i++) {
       currentRaw += analogRead(esp32_pin.current_pin);
       voltageRaw += analogRead(esp32_pin.voltage_pin);
@@ -930,7 +930,7 @@ void CmndTestCommand(void) {
 }
 
 void CmndTestPower(void) {
-  Response_P(PSTR("{\"%s\":%s, "), "test_toggle", TestPowerStatus.test_toggle ? "ON" : "OFF");
+  Response_P(PSTR("{\"%s\":\"%s\", "), "test_toggle", TestPowerStatus.test_toggle ? "ON" : "OFF");
   ResponseAppend_P(PSTR("\"%s\":%f, "), "test_current", TestPowerStatus.test_current);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "test_voltage", TestPowerStatus.test_voltage);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "test_power", TestPowerStatus.test_power);
@@ -939,7 +939,7 @@ void CmndTestPower(void) {
 }
 
 void CmndCafePlugStatus(void) {
-  Response_P(PSTR("{\"%s\":%s, "), "status_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  Response_P(PSTR("{\"%s\":\"%s\", "), "status_toggle", PowerStatus.toggle ? "ON" : "OFF");
   ResponseAppend_P(PSTR("\"%s\":%f, "), "status_current", PowerStatus.current);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "status_voltage", PowerStatus.voltage);
   ResponseAppend_P(PSTR("\"%s\":%f}"), "status_power", PowerStatus.power);
@@ -947,7 +947,7 @@ void CmndCafePlugStatus(void) {
 
 void CmndMeasurePower(void) {
   MeasurePowerEverySecond();
-  Response_P(PSTR("{\"%s\":%s, "), "measure_toggle", PowerStatus.toggle ? "ON" : "OFF");
+  Response_P(PSTR("{\"%s\":\"%s\", "), "measure_toggle", PowerStatus.toggle ? "ON" : "OFF");
   ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_current", PowerStatus.current);
   ResponseAppend_P(PSTR("\"%s\":%f, "), "measure_voltage", PowerStatus.voltage);
   ResponseAppend_P(PSTR("\"%s\":%f}"), "measure_power", PowerStatus.power);
