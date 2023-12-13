@@ -57,7 +57,7 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
 ### How to use CafePlugGuardian-Hardware
 * Require Hardware
     * esp32
-        * main micro control unit
+        * Main micro control unit
         * In our project, we used the lolin d32 pro development board, but it doesn't matter as long as it is an esp32.
         * To use the esp8266, you need to modify the code, and since there is only one ADC, analog measurement of voltage is impossible, so you need to find another method.
     * ACS712
@@ -67,7 +67,28 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
     * Zmpt101b
         * voltage sensor
     * Resistance
+        * Used for voltage distribution and RC low pass filter.
     * Capacitor
+        * Used for RC low pass filter.
+
+* Circuit Design
+    * This circuit may be inaccurate as it was created by a computer engineering student with limited circuit knowledge.
+    * <img width="80%" src="https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Server/assets/55429793/74940115-831a-49f7-ab9a-3d5dc402089a"/>
+    * Power Supply
+        * Supplying 5v power through USB has a lot of noise, so supply power through a 5.5mm barrel jack, which is a little cleaner.
+        * The esp32 development board I have does not have a 5.5mm port, so I supply power through Arduino Uno instead.
+        * If there is another way to supply clean power, it is recommended to supply it instead of Arduino Uno.
+    * Current Measurement Circuit
+        * Since esp32 is 3.3v based, it is dangerous to receive the 5v signal from ACS712 as is, so the voltage is distributed using 5k ohm and 10k ohm resistors.
+            * The minimum value of Output Resistive Load of the ACS712 sensor is 4.7k ohm, so set R1 to 5k ohm, which is larger than that.
+            * I don't know if this is correct due to my lack of circuit knowledge, but when dividing the voltage between 1k ohm and 2k ohm, it was not distributed properly.
+        * Implement RC low pass filter with 5k ohm resistor and 10nF capacitor.
+            * The ACS712 sensor module itself has an RC filter implemented, and I understand that the capacitor capacity is different for each module (not sure), but the cutoff frequency is usually very high due to the small capacity.
+            * Since I don't know how to solder, I implemented a filter on the output signal, but if you can solder, I recommend connecting a 100nF capacitor to the filter part of the module.
+            * The larger the capacity of the capacitor, the lower the cutoff frequency of the low pass filter, so noise is reduced, but precise patterns may disappear, so an appropriate value must be found.
+    * Voltage Measurement Circuit
+        * When 3.3v is supplied to the voltage sensor's VCC, measurement results of 0 to 3.3v are automatically output.
+        * Implement RC low pass filter with 10k ohm resistor and 100nF capacitor.
 
 
 ## License
