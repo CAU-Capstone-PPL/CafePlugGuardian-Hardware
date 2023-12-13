@@ -54,6 +54,10 @@ Tasmota is an open-source firmware that provides a web interface, MQTT support, 
 
 For more in-depth information on Tasmota and its functionalities, it's recommended to explore the official Tasmota GitHub repository: [Tasmota GitHub Repository](https://github.com/arendst/Tasmota)
 
+### Change Log
+* [ChangeLog](./CHANGELOG.md)
+* Excluding the contents of tasmota open source, I only wrote the modification log of the CafePlugGuardian-Hardware project.
+
 ### How to use CafePlugGuardian-Hardware
 * Require Hardware
     * esp32
@@ -91,6 +95,37 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
         * When 3.3v is supplied to the voltage sensor's VCC, measurement results of 0 to 3.3v are automatically output.
         * Implement RC low pass filter with 10k ohm resistor and 100nF capacitor.
 
+* Build and Upload
+    1. Use PlatformIO
+        * Install PlatfromIO in vscode
+    2. Change project environment settings
+        * tasmota32-samplingCurrent
+    3. User Config Settings
+        * Edit /tasmota/user_config_override.h file
+        * Modify the MQTT_HOST preprocessor to register the address of the MQTT broker you will use.
+        * Wi-Fi SSID and password can be set in advance to connect in a similar way
+        * It is not a required task, and can be added on the tasmota web page after uploading.
+    4. Build
+    5. Upload
+        * After building, connect esp32 to UART and upload by pressing the upload button.
+        * If you have a device that already has Tasmota installed, you can upload the built firmware from the tasmota web page.
+            * However, in this case, changes to user_config_override.h are not reflected.
+            * Edit it directly on the web page, or go into the console and use the reset command.
+                * Different reset functions are performed depending on the option, so refer to the reset command description in the following link.
+                * https://tasmota.github.io/docs/Commands/#management
+                * reset 5: Reset while maintaining Wi-Fi settings
+                * reset 6: Reset while maintaining Wi-Fi and MQTT
+
+* How to use Smart Plug
+    * [CafePlugGuardian-Client](https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Client)
+        * User app project by CafePlugGuardian.
+        * Basically, the app provides a manual and sets it automatically.
+        * If you have a problem with the app, you can follow tasmota's basic method as described below, but you cannot use CafePlugGuardian's services.
+    * Tasmota Basic Method
+        * If you don't have Wi-Fi set up, the plug creates a hotspot.
+        * After connecting to the hotspot, go to 192.168.4.1 and access the plug settings web page.
+        * Enter the Wi-Fi SSID and password to connect and wait for it to reboot.
+        * After that, you can access the management page using the IP address assigned to the plug (by connecting to the same Wi-Fi as the plug).
 
 ## License
 This program is licensed under GPL-3.0
