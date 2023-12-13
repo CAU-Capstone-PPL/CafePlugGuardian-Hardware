@@ -73,7 +73,7 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
 
 * Circuit Design
     * This circuit may be inaccurate as it was created by a computer engineering student with limited circuit knowledge.
-    * <img width="80%" src="https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Server/assets/55429793/74940115-831a-49f7-ab9a-3d5dc402089a"/>
+      <img width="70%" src="https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Server/assets/55429793/bb297a10-9cf0-49ef-acb7-77a32b713c51"/>
     * Power Supply
         * Supplying 5v power through USB has a lot of noise, so supply power through a 5.5mm barrel jack, which is a little cleaner.
         * The esp32 development board I have does not have a 5.5mm port, so I supply power through Arduino Uno instead.
