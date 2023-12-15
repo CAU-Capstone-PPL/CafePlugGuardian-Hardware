@@ -76,8 +76,9 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
         * Used for RC low pass filter.
 
 * Circuit Design
-    * <h4>This circuit may be inaccurate as it was created by a computer engineering student with limited circuit knowledge.</h4>
-     <img width="70%" src="https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Server/assets/55429793/bb297a10-9cf0-49ef-acb7-77a32b713c51"/>
+    * **This circuit may be inaccurate as it was created by a computer engineering student with limited circuit knowledge.**
+
+        <img width="80%" src="https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Server/assets/55429793/bb297a10-9cf0-49ef-acb7-77a32b713c51"/>
      
     * Power Supply
         * Supplying 5v power through USB has a lot of noise, so supply power through a 5.5mm barrel jack, which is a little cleaner.
@@ -115,6 +116,12 @@ For more in-depth information on Tasmota and its functionalities, it's recommend
                 * https://tasmota.github.io/docs/Commands/#management
                 * reset 5: Reset while maintaining Wi-Fi settings
                 * reset 6: Reset while maintaining Wi-Fi and MQTT
+    6. Rule activation
+        * Currently, the rule set in user_config_override.h does not work immediately.
+        * You must enter the console and activate the rule with the following command.
+        * Rule1 1
+        * Reboot the plug after activating the rule.
+        * If we find a way to activate it automatically without having to activate it manually, we will fix it.
 
 * How to use Smart Plug
     * [CafePlugGuardian-Client](https://github.com/CAU-Capstone-PPL/CafePlugGuardian-Client)
